@@ -5,25 +5,8 @@ import { QueryClient, QueryFunction } from "@tanstack/react-query";
 // - Local dev: empty string (same origin, Express serves both frontend + API on port 5000)
 // - Deployed (proxy): walk up from /web/direct-files/.../dist/public/ to proxy root, then /port/5000
 function getApiBase(): string {
-  // Check for explicit API URL (set when frontend is deployed separately from backend)
-  const explicitUrl = import.meta.env.VITE_API_URL;
-  if (explicitUrl) return explicitUrl;
-
-  const placeholder = "__PORT_5000__";
-  if (placeholder.startsWith("__")) {
-    // Not replaced = local dev, use relative (same origin)
-    return "";
-  }
-  // Deployed: placeholder was replaced with "port/5000"
-  // We need the absolute proxy path: extract everything before /web/ from the current URL
-  const loc = window.location;
-  const webIdx = loc.pathname.indexOf("/web/");
-  if (webIdx !== -1) {
-    // e.g. /sites/proxy/JWT/web/... → /sites/proxy/JWT/port/5000
-    return loc.origin + loc.pathname.substring(0, webIdx) + "/" + placeholder;
-  }
-  // Fallback
-  return "/" + placeholder;
+  // Production backend on Render (24/7, persistent PostgreSQL)
+  return "https://bounty-hunter-cywu.onrender.com";
 }
 
 const API_BASE = getApiBase();

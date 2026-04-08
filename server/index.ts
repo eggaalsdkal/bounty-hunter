@@ -1,4 +1,5 @@
 import express, { type Request, Response, NextFunction } from "express";
+import cors from "cors";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
@@ -20,6 +21,15 @@ app.use(
     },
   }),
 );
+
+// CORS — allow Perplexity frontend and any origin (for public API demo)
+app.use(cors({
+  origin: true, // reflect request origin
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Visitor-Id'],
+}));
+app.options('*', cors());
 
 app.use(express.urlencoded({ extended: false }));
 
