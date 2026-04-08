@@ -3,19 +3,19 @@ import { Map, ClipboardList, BookOpen, User, Settings } from "lucide-react";
 
 const navItems = [
   { path: "/", label: "任務大陸", en: "Dashboard", icon: Map },
-  { path: "/quests", label: "任務看板", en: "Quest Board", icon: ClipboardList },
+  { path: "/quests", label: "任務看板", en: "Bounty Board", icon: ClipboardList },
   { path: "/cards", label: "卡牌圖鑑", en: "Cards", icon: BookOpen },
   { path: "/profile", label: "獵人檔案", en: "Profile", icon: User },
 ];
 
-function QuestHunterLogo() {
+function BountyHunterLogo() {
   return (
     <svg
       width="40"
       height="40"
       viewBox="0 0 48 48"
       fill="none"
-      aria-label="Quest Hunter Logo"
+      aria-label="Bounty Hunter Logo"
     >
       {/* Compass outer ring */}
       <circle cx="24" cy="24" r="22" stroke="hsl(175, 100%, 36%)" strokeWidth="2" />
@@ -42,10 +42,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <aside className="w-[220px] flex-shrink-0 flex flex-col bg-sidebar border-r border-sidebar-border" data-testid="sidebar">
         {/* Logo */}
         <div className="p-5 flex items-center gap-3 border-b border-sidebar-border">
-          <QuestHunterLogo />
+          <BountyHunterLogo />
           <div>
-            <h1 className="font-display text-sm font-bold text-foreground leading-tight">任務獵人</h1>
-            <p className="text-[10px] text-muted-foreground tracking-wider">QUEST HUNTER</p>
+            <h1 className="font-display text-sm font-bold text-foreground leading-tight">賞金獵人</h1>
+            <p className="text-[10px] text-muted-foreground tracking-wider">BOUNTY HUNTER</p>
           </div>
         </div>
 

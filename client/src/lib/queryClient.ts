@@ -1,6 +1,32 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
-const API_BASE = "__PORT_5000__".startsWith("__") ? "" : "__PORT_5000__";
+// Compute API base URL:
+// - Explicit VITE_API_URL: used when frontend is deployed separately from backend (e.g. Railway)
+// - Local dev: empty string (same origin, Express serves both frontend + API on port 5000)
+// - Deployed (proxy): walk up from /web/direct-files/.../dist/public/ to proxy root, then /port/5000
+function getApiBase(): string {
+  // Check for explicit API URL (set when frontend is deployed separately from backend)
+  const explicitUrl = import.meta.env.VITE_API_URL;
+  if (explicitUrl) return explicitUrl;
+
+  const placeholder = "__PORT_5000__";
+  if (placeholder.startsWith("__")) {
+    // Not replaced = local dev, use relative (same origin)
+    return "";
+  }
+  // Deployed: placeholder was replaced with "port/5000"
+  // We need the absolute proxy path: extract everything before /web/ from the current URL
+  const loc = window.location;
+  const webIdx = loc.pathname.indexOf("/web/");
+  if (webIdx !== -1) {
+    // e.g. /sites/proxy/JWT/web/... → /sites/proxy/JWT/port/5000
+    return loc.origin + loc.pathname.substring(0, webIdx) + "/" + placeholder;
+  }
+  // Fallback
+  return "/" + placeholder;
+}
+
+const API_BASE = getApiBase();
 
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
@@ -18,6 +44,7 @@ export async function apiRequest(
     method,
     headers: data ? { "Content-Type": "application/json" } : {},
     body: data ? JSON.stringify(data) : undefined,
+    credentials: "include",
   });
 
   await throwIfResNotOk(res);
@@ -30,14 +57,26 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
-    const res = await fetch(`${API_BASE}${queryKey.join("/")}`);
+    try {
+      const res = await fetch(`${API_BASE}${queryKey.join("/")}`, {
+        credentials: "include",
+      });
 
-    if (unauthorizedBehavior === "returnNull" && res.status === 401) {
+      if (unauthorizedBehavior === "returnNull" && res.status === 401) {
+        return null;
+      }
+
+      // Proxy errors (403/503) or server down — treat as null so app still loads
+      if (res.status === 403 || res.status === 503 || res.status === 502) {
+        return null;
+      }
+
+      await throwIfResNotOk(res);
+      return await res.json();
+    } catch {
+      // Network error (server unreachable) — return null so app falls back to demo data
       return null;
     }
-
-    await throwIfResNotOk(res);
-    return await res.json();
   };
 
 export const queryClient = new QueryClient({

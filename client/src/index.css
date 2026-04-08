@@ -4,7 +4,7 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Quest Hunter — Dark-first game UI theme */
+/* Bounty Hunter — Dark-first game UI theme */
 
 :root {
   --button-outline: rgba(255,255,255, .10);
