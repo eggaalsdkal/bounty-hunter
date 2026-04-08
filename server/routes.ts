@@ -12,7 +12,7 @@ function getVisitorId(req: Request): string {
 async function requireAuth(req: Request, res: Response, next: NextFunction) {
   const visitorId = getVisitorId(req);
   if (!visitorId) return res.status(401).json({ message: "Not authenticated" });
-  const user = storage.getUserByVisitorId(visitorId);
+  const user = await storage.getUserByVisitorId(visitorId);
   if (!user) return res.status(401).json({ message: "Not authenticated" });
   (req as any).user = user;
   (req as any).userId = user.id;
@@ -380,7 +380,7 @@ export async function registerRoutes(
       }
 
       // Check if email already exists
-      const existing = storage.getUserByEmail(email);
+      const existing = await storage.getUserByEmail(email);
       if (existing) {
         return res.status(409).json({ message: "Email already registered" });
       }
@@ -389,14 +389,14 @@ export async function registerRoutes(
       const hashedPassword = await bcrypt.hash(password, 10);
 
       // Create user
-      const user = storage.createUser({
+      const user = await storage.createUser({
         email,
         password: hashedPassword,
         displayName,
       });
 
       // Create initial stats (all 0)
-      storage.createUserStats({
+      await storage.createUserStats({
         userId: user.id,
         INT: 0,
         FOC: 0,
@@ -418,12 +418,12 @@ export async function registerRoutes(
         }
       }
       for (let i = 0; i < welcomeCardIds.length; i++) {
-        storage.upsertUserCard(user.id, welcomeCardIds[i], 1);
+        await storage.upsertUserCard(user.id, welcomeCardIds[i], 1);
       }
 
       // Bind visitorId to user
       if (visitorId) {
-        storage.updateVisitorId(user.id, visitorId);
+        await storage.updateVisitorId(user.id, visitorId);
       }
 
       return res.status(201).json({
@@ -449,7 +449,7 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Email and password are required" });
       }
 
-      const user = storage.getUserByEmail(email);
+      const user = await storage.getUserByEmail(email);
       if (!user) {
         return res.status(401).json({ message: "Invalid email or password" });
       }
@@ -461,7 +461,7 @@ export async function registerRoutes(
 
       // Bind visitorId to user
       if (visitorId) {
-        storage.updateVisitorId(user.id, visitorId);
+        await storage.updateVisitorId(user.id, visitorId);
       }
 
       return res.json({
@@ -478,10 +478,10 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/auth/me", (req: Request, res: Response) => {
+  app.get("/api/auth/me", async (req: Request, res: Response) => {
     const visitorId = getVisitorId(req);
     if (!visitorId) return res.status(401).json({ message: "Not authenticated" });
-    const user = storage.getUserByVisitorId(visitorId);
+    const user = await storage.getUserByVisitorId(visitorId);
     if (!user) return res.status(401).json({ message: "Not authenticated" });
 
     return res.json({
@@ -494,11 +494,11 @@ export async function registerRoutes(
     });
   });
 
-  app.post("/api/auth/logout", (req: Request, res: Response) => {
+  app.post("/api/auth/logout", async (req: Request, res: Response) => {
     const visitorId = getVisitorId(req);
-    const user = storage.getUserByVisitorId(visitorId);
+    const user = await storage.getUserByVisitorId(visitorId);
     if (user) {
-      storage.clearVisitorId(user.id);
+      await storage.clearVisitorId(user.id);
     }
     return res.json({ message: "Logged out" });
   });
@@ -509,9 +509,9 @@ export async function registerRoutes(
     return res.json(allCards);
   });
 
-  app.get("/api/cards/inventory", requireAuth, (req: Request, res: Response) => {
+  app.get("/api/cards/inventory", requireAuth, async (req: Request, res: Response) => {
     const userId = (req as any).userId;
-    const inventory = storage.getUserCards(userId);
+    const inventory = await storage.getUserCards(userId);
     // Return a map of cardId -> quantity
     const inventoryMap: Record<string, number> = {};
     for (const item of inventory) {
@@ -520,12 +520,12 @@ export async function registerRoutes(
     return res.json(inventoryMap);
   });
 
-  app.post("/api/cards/draw", requireAuth, (req: Request, res: Response) => {
+  app.post("/api/cards/draw", requireAuth, async (req: Request, res: Response) => {
     const userId = (req as any).userId;
     const today = new Date().toISOString().split("T")[0];
 
     // Check if already drawn today
-    const existing = storage.getDailyDraw(userId, today);
+    const existing = await storage.getDailyDraw(userId, today);
     if (existing) {
       return res.status(400).json({ message: "Already drawn today", alreadyDrawn: true });
     }
@@ -547,10 +547,10 @@ export async function registerRoutes(
     const drawnCard = pool[Math.floor(Math.random() * pool.length)];
 
     // Add to inventory
-    const updatedCard = storage.upsertUserCard(userId, drawnCard.id, 1);
+    const updatedCard = await storage.upsertUserCard(userId, drawnCard.id, 1);
 
     // Log the draw
-    storage.addDailyDraw({
+    await storage.addDailyDraw({
       userId,
       cardId: drawnCard.id,
       drawnAt: today,
@@ -562,17 +562,17 @@ export async function registerRoutes(
     });
   });
 
-  app.post("/api/cards/use/:cardId", requireAuth, (req: Request, res: Response) => {
+  app.post("/api/cards/use/:cardId", requireAuth, async (req: Request, res: Response) => {
     const userId = (req as any).userId;
     const cardId = String(req.params.cardId);
 
-    const userCard = storage.getUserCard(userId, cardId);
+    const userCard = await storage.getUserCard(userId, cardId);
     if (!userCard || userCard.quantity <= 0) {
       return res.status(400).json({ message: "You don't have this card" });
     }
 
     // Consume 1 card
-    const updated = storage.upsertUserCard(userId, cardId, -1);
+    const updated = await storage.upsertUserCard(userId, cardId, -1);
 
     return res.json({
       cardId,
@@ -583,11 +583,11 @@ export async function registerRoutes(
 
   // ===== QUESTS API =====
 
-  app.get("/api/quests", requireAuth, (req: Request, res: Response) => {
+  app.get("/api/quests", requireAuth, async (req: Request, res: Response) => {
     const userId = (req as any).userId;
 
     // Get user's quest history for recommendations
-    const history = storage.getQuestHistory(userId);
+    const history = await storage.getQuestHistory(userId);
     const historyForCalc = history.map((h) => ({
       type: h.type,
       hoursSpent: h.hoursSpent,
@@ -608,7 +608,7 @@ export async function registerRoutes(
     const recommended = getRecommendedQuests(allQuests, stats, historyWithRegion);
 
     // Mark accepted quests
-    const accepted = storage.getAcceptedQuests(userId);
+    const accepted = await storage.getAcceptedQuests(userId);
     const acceptedMap = new Map(accepted.map((a) => [a.questId, a.status]));
 
     const result = recommended.map((q) => ({
@@ -619,7 +619,7 @@ export async function registerRoutes(
     return res.json(result);
   });
 
-  app.post("/api/quests/:id/accept", requireAuth, (req: Request, res: Response) => {
+  app.post("/api/quests/:id/accept", requireAuth, async (req: Request, res: Response) => {
     const userId = (req as any).userId;
     const questId = String(req.params.id);
 
@@ -629,12 +629,12 @@ export async function registerRoutes(
     }
 
     // Check if already accepted
-    const existing = storage.getAcceptedQuest(userId, questId);
+    const existing = await storage.getAcceptedQuest(userId, questId);
     if (existing && existing.status === "active") {
       return res.status(400).json({ message: "Quest already accepted" });
     }
 
-    const accepted = storage.acceptQuest({
+    const accepted = await storage.acceptQuest({
       userId,
       questId,
       acceptedAt: new Date().toISOString(),
@@ -644,7 +644,7 @@ export async function registerRoutes(
     return res.json(accepted);
   });
 
-  app.post("/api/quests/:id/complete", requireAuth, (req: Request, res: Response) => {
+  app.post("/api/quests/:id/complete", requireAuth, async (req: Request, res: Response) => {
     const userId = (req as any).userId;
     const questId = String(req.params.id);
     const { hoursSpent, rating } = req.body;
@@ -655,16 +655,16 @@ export async function registerRoutes(
     }
 
     // Check if accepted
-    const accepted = storage.getAcceptedQuest(userId, questId);
+    const accepted = await storage.getAcceptedQuest(userId, questId);
     if (!accepted || accepted.status !== "active") {
       return res.status(400).json({ message: "Quest not active" });
     }
 
     // Mark as completed
-    storage.updateAcceptedQuestStatus(userId, questId, "completed");
+    await storage.updateAcceptedQuestStatus(userId, questId, "completed");
 
     // Add to quest history
-    storage.addQuestHistory({
+    await storage.addQuestHistory({
       userId,
       questId,
       type: quest.type,
@@ -675,18 +675,18 @@ export async function registerRoutes(
     });
 
     // Update user currency + XP
-    const user = storage.getUser(userId)!;
+    const user = (await storage.getUser(userId))!;
     const xpGain = quest.reward * 2; // 2 XP per 奧里
     const { level, xp: newXp } = calculateLevelAndXp(user.level, user.xp, xpGain);
 
-    storage.updateUser(userId, {
+    await storage.updateUser(userId, {
       level,
       xp: newXp,
       currency: user.currency + quest.reward,
     });
 
     // Recalculate stats
-    const allHistory = storage.getQuestHistory(userId);
+    const allHistory = await storage.getQuestHistory(userId);
     const calcHistory = allHistory.map((h) => ({
       type: h.type,
       hoursSpent: h.hoursSpent,
@@ -694,7 +694,7 @@ export async function registerRoutes(
       completedAt: h.completedAt,
     }));
     const newStats = calculateStatsFromHistory(calcHistory);
-    storage.updateUserStats(userId, {
+    await storage.updateUserStats(userId, {
       INT: newStats.INT,
       FOC: newStats.FOC,
       STR: newStats.STR,
@@ -713,9 +713,10 @@ export async function registerRoutes(
     });
   });
 
-  app.get("/api/quests/active", requireAuth, (req: Request, res: Response) => {
+  app.get("/api/quests/active", requireAuth, async (req: Request, res: Response) => {
     const userId = (req as any).userId;
-    const accepted = storage.getAcceptedQuests(userId).filter((a) => a.status === "active");
+    const allAccepted = await storage.getAcceptedQuests(userId);
+    const accepted = allAccepted.filter((a) => a.status === "active");
 
     // Enrich with quest data
     const result = accepted.map((a) => {
@@ -731,17 +732,17 @@ export async function registerRoutes(
 
   // ===== PROFILE API =====
 
-  app.get("/api/profile", requireAuth, (req: Request, res: Response) => {
+  app.get("/api/profile", requireAuth, async (req: Request, res: Response) => {
     const userId = (req as any).userId;
-    const user = storage.getUser(userId);
+    const user = await storage.getUser(userId);
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
 
-    const stats = storage.getUserStats(userId);
-    const history = storage.getQuestHistory(userId);
-    const cards = storage.getUserCards(userId);
-    const accepted = storage.getAcceptedQuests(userId);
+    const stats = await storage.getUserStats(userId);
+    const history = await storage.getQuestHistory(userId);
+    const cards = await storage.getUserCards(userId);
+    const accepted = await storage.getAcceptedQuests(userId);
 
     const completedCount = accepted.filter((a) => a.status === "completed").length;
     const totalEarnings = history.reduce((sum, h) => sum + h.reward, 0);
@@ -773,9 +774,9 @@ export async function registerRoutes(
     });
   });
 
-  app.get("/api/profile/stats", requireAuth, (req: Request, res: Response) => {
+  app.get("/api/profile/stats", requireAuth, async (req: Request, res: Response) => {
     const userId = (req as any).userId;
-    const history = storage.getQuestHistory(userId);
+    const history = await storage.getQuestHistory(userId);
 
     const calcHistory = history.map((h) => ({
       type: h.type,
@@ -788,7 +789,7 @@ export async function registerRoutes(
     const breakdown = getStatBreakdown(calcHistory);
 
     // Update stored stats
-    storage.updateUserStats(userId, {
+    await storage.updateUserStats(userId, {
       INT: stats.INT,
       FOC: stats.FOC,
       STR: stats.STR,
