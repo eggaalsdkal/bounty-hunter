@@ -77,8 +77,7 @@ app.use((req, res, next) => {
       await storage.initPostgres();
       console.log("PostgreSQL tables initialized");
     } catch (err) {
-      console.error("Failed to initialize PostgreSQL tables:", err);
-      process.exit(1);
+      console.error("Failed to initialize PostgreSQL, falling back to SQLite:", err);
     }
   }
 

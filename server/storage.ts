@@ -18,9 +18,7 @@ let pgPool: Pool | null = null;
 if (usePostgres) {
   pgPool = new Pool({
     connectionString: process.env.DATABASE_URL,
-    ssl: process.env.DATABASE_URL?.includes("render.com")
-      ? { rejectUnauthorized: false }
-      : false,
+    ssl: { rejectUnauthorized: false },
     max: 5,
     idleTimeoutMillis: 30000,
   });
